@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+
+  app:
+    image: webdevops/php-nginx:8.2
+    container_name: payment_api_app
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/app
+    environment:
+      - WEB_DOCUMENT_ROOT=/app/public
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8
+    container_name: payment_api_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: payments_db
+      MYSQL_USER: payment_api
+      MYSQL_PASSWORD: payment_api
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  gateways:
+    image: matheusprotzen/gateways-mock
+    container_name: payment_api_gateways
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+
+volumes:
+  mysql_data:
