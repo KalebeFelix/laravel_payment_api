@@ -19,7 +19,7 @@ class RefundService
 
         try {
 
-            $gateway = GatewayFactory::make($transaction->gateway);
+            $gateway = GatewayFactory::make($transaction->gateway->name);
 
             $response = $gateway->refund($transaction->external_id);
 

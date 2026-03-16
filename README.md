@@ -50,6 +50,21 @@ Representação das entidades do banco de dados.
 
 ---
 
+Controle de Acesso (RBAC)
+
+A API implementa controle de acesso baseado em papéis (Role Based Access Control - RBAC) para garantir que apenas usuários autorizados possam acessar determinadas funcionalidades do sistema.
+
+Cada usuário possui um campo role que define seu nível de permissão.
+
+Papéis disponíveis:
+
+ADMIN
+MANAGER
+FINANCE
+USER
+
+---
+
 # Fluxo de Pagamento
 
 1. Cliente envia requisição de compra
