@@ -1,59 +1,392 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Payment API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API de processamento de pagamentos desenvolvida em **Laravel**, com suporte a múltiplos gateways, filas assíncronas, controle de estoque e sistema de reembolso.
 
-## About Laravel
+O objetivo do projeto é simular uma **plataforma de pagamentos resiliente**, capaz de:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+* Processar compras
+* Utilizar múltiplos gateways de pagamento
+* Utilizar **fila para processamento assíncrono**
+* Controlar estoque de produtos
+* Registrar transações
+* Realizar **reembolsos**
+* Autenticação de usuários via token
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+# Tecnologias Utilizadas
 
-## Learning Laravel
+* PHP 8.2
+* Laravel
+* MySQL
+* Docker
+* Laravel Queue
+* Laravel Sanctum
+* HTTP Client (Laravel)
+* Gateways Mock
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+---
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# Arquitetura
 
-## Laravel Sponsors
+A aplicação foi organizada utilizando **separação de responsabilidades**, com serviços responsáveis pela lógica de negócio.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Estrutura principal:
 
-### Premium Partners
+Controllers
+Responsáveis por receber requisições HTTP e retornar respostas.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Services
+Contêm a lógica de negócio do sistema.
 
-## Contributing
+Jobs
+Responsáveis por executar pagamentos de forma assíncrona.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Gateways
+Implementação da estratégia para integração com diferentes gateways.
 
-## Code of Conduct
+Models
+Representação das entidades do banco de dados.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+# Fluxo de Pagamento
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Cliente envia requisição de compra
+2. Sistema valida estoque
+3. Transação é criada com status **pending**
+4. Job é enviado para **fila de processamento**
+5. Worker tenta processar pagamento nos gateways disponíveis
+6. Se aprovado:
 
-## License
+   * status → approved
+   * external_id salvo
+7. Se todos falharem:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+   * status → failed
+
+Essa estratégia permite **alta resiliência**, pois se um gateway falhar o sistema tenta outro automaticamente.
+
+---
+
+# Sistema de Gateways
+
+A aplicação possui suporte para múltiplos gateways utilizando o padrão **Strategy**.
+
+GatewayFactory cria dinamicamente o serviço correto:
+
+* Gateway1Service
+* Gateway2Service
+
+A prioridade de execução é definida na tabela **gateways**.
+
+---
+
+# Processamento Assíncrono
+
+O pagamento não é processado diretamente na requisição HTTP.
+
+Em vez disso:
+
+1. A transação é criada
+2. Um **ProcessPaymentJob** é enviado para a fila
+3. O worker processa a cobrança
+
+Configuração do Job:
+
+* 5 tentativas
+* backoff progressivo
+
+```
+public $tries = 5;
+public $backoff = [10, 30, 60];
+```
+
+---
+
+# Banco de Dados
+
+Principais tabelas:
+
+users
+Controle de acesso ao sistema.
+
+clients
+Clientes que realizam compras.
+
+products
+Produtos disponíveis para compra.
+
+transactions
+Registro das transações de pagamento.
+
+transaction_products
+Relacionamento entre produtos e transações.
+
+gateways
+Gateways de pagamento disponíveis.
+
+---
+
+# Como Rodar o Projeto
+
+### 1 - Clonar repositório
+
+```
+git clone <repo>
+cd payment-api
+```
+
+---
+
+### 2 - Subir containers
+
+```
+docker-compose up -d
+```
+
+---
+
+### 3 - Instalar dependências
+
+```
+docker exec -it payment_api_app composer install
+```
+
+---
+
+### 4 - Configurar ambiente
+
+Copiar arquivo:
+
+```
+cp .env.example .env
+```
+
+Gerar chave:
+
+```
+php artisan key:generate
+```
+
+---
+
+### 5 - Rodar migrations
+
+```
+php artisan migrate
+```
+
+---
+
+### 6 - Inserir gateways
+
+Exemplo via tinker:
+
+```
+php artisan tinker
+```
+
+```
+Gateway::create([
+"name" => "gateway1",
+"priority" => 1,
+"is_active" => true
+]);
+
+Gateway::create([
+"name" => "gateway2",
+"priority" => 2,
+"is_active" => true
+]);
+```
+
+---
+
+### 7 - Iniciar worker da fila
+
+```
+php artisan queue:work
+```
+
+---
+
+# Autenticação
+
+A autenticação é feita utilizando **Laravel Sanctum**.
+
+Login retorna um token Bearer.
+
+Exemplo de resposta:
+
+```
+{
+"access_token": "token",
+"token_type": "Bearer"
+}
+```
+
+O token deve ser enviado no header:
+
+```
+Authorization: Bearer TOKEN
+```
+
+---
+
+# Endpoints
+
+## Auth
+
+POST /login
+
+Realiza autenticação do usuário.
+
+---
+
+## Users
+
+GET /users
+Lista usuários
+
+POST /users
+Cria usuário
+
+GET /users/{id}
+
+PUT /users/{id}
+
+DELETE /users/{id}
+
+---
+
+## Products
+
+GET /products
+
+POST /products
+
+GET /products/{id}
+
+PUT /products/{id}
+
+DELETE /products/{id}
+
+---
+
+## Clients
+
+GET /clients
+
+GET /clients/{id}
+
+Retorna cliente com histórico de transações.
+
+---
+
+## Transactions
+
+GET /transactions
+
+GET /transactions/{id}
+
+---
+
+## Purchase
+
+POST /purchase
+
+Exemplo:
+
+```
+{
+"name": "Kalebe",
+"email": "kalebe@email.com",
+"cardNumber": "4111111111111111",
+"cvv": "123",
+"products": [
+{
+"product_id": 1,
+"quantity": 2
+}
+]
+}
+```
+
+Resposta:
+
+```
+{
+"status": "processing",
+"transaction_id": 1
+}
+```
+
+---
+
+## Refund
+
+POST /transactions/{id}/refund
+
+Realiza reembolso da transação.
+
+---
+
+# Controle de Estoque
+
+Ao realizar uma compra:
+
+1. O sistema valida o estoque
+2. Após a criação da transação
+3. O estoque do produto é decrementado
+
+```
+$product->decrement('amount', $item['quantity']);
+```
+
+---
+
+# Estratégias de Resiliência
+
+O sistema implementa:
+
+* Failover entre gateways
+* Processamento assíncrono
+* Retry automático
+* Separação de responsabilidades
+* Logs de processamento
+
+---
+
+# Melhorias Futuras
+
+* Implementar circuit breaker para gateways
+* Monitoramento de filas
+* Cache de gateways ativos
+* Rate limit de pagamentos
+* Dashboard administrativo
+* Testes automatizados
+
+---
+
+# Considerações Finais
+
+Todas as funcionalidades principais do teste foram implementadas:
+
+* Autenticação
+* CRUD de usuários
+* CRUD de produtos
+* Controle de clientes
+* Sistema de pagamentos
+* Integração com gateways
+* Processamento em fila
+* Reembolso de transações
+
+Caso algum ponto não tenha sido completamente explorado, ele foi documentado na seção de melhorias futuras.
+
+---
+
+# Autor
+
+Kalebe Felix
+Desenvolvedor Full Stack

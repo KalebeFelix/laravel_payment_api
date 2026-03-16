@@ -13,10 +13,17 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('client_id')->constrained()->onDelete('cascade');
-            $table->foreignId('gateway_id')->constrained()->onDelete('cascade');
+            $table->foreignId('client_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('gateway_id')->nullable()->constrained()->nullOnDelete();
             $table->string('external_id')->nullable();
-            $table->enum('status', ['approved', 'failed', 'refunded'])->default('failed');
+
+            $table->enum('status', [
+                'pending',
+                'approved',
+                'failed',
+                'refunded'
+            ])->default('pending');
+
             $table->integer('amount');
             $table->string('card_last_numbers', 4)->nullable();
             $table->timestamps();
